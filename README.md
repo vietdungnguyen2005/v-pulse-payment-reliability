@@ -1,99 +1,68 @@
-# V-Pulse
+# V-Pulse — Safe Payment Investigation
 
-### Dependency audit policy (2026-10-18)
+An operations dashboard for investigating uncertain **simulated** payments, reviewing provider evidence and resolving confirmed outcomes without blindly submitting the payment again.
 
-Run `npm run audit:dependencies`. Runtime dependencies retain a strict high/critical audit. The full audit uses `audit-ci.json` with one user-approved, exact advisory-and-lint-path exception for GHSA-vfj7-8cjw-p6xm (unpatched braces stack exhaustion), expiring at 00:00 Asia/Bangkok on 2026-11-18. This is accepted risk, not a vulnerability fix or a zero-findings claim. Lint only trusted repository configuration; do not feed untrusted root-directory glob patterns into the lint tool. All other high/critical findings and audit-service failures still block CI. Remove the exception when upstream is patched; do not renew automatically.
+[Live demo](https://v-pulse-payment-ops.vmarket-vietdung2005.workers.dev/) · [Incident results](docs/fde/incident-report.md) · [Evidence and screenshots](docs/fde/acceptance-tests.md) · [Run locally](docs/developer-guide.md)
 
-Local reconciliation update (2026-10-24): V4 remains fail-closed for unknown outcomes. V5 adds stable references, an independently committed simulator ledger, read-only provider lookup and separate operator confirmation. Verified success resolves locally without another authorization; verified final rejection can grant controlled replay permission only under this simulator's no-execution guarantee. Unknown/unavailable/NOT_FOUND and historical missing references remain blocked. See [implementation and A–E game-day evidence](docs/fde/acceptance-tests.md). This feature branch has not been deployed; historical hosting artifacts do not prove this capability is live. Rollout requires additive V5 and pausing older writers.
+## Problem & Solution
 
-V-Pulse is a payment-reliability control plane built as portfolio evidence for backend, cloud-oriented, and full-stack roles. It demonstrates how a team can contain an unhealthy downstream payment rail, park uncertain work, and recover it through an explicit audited replay instead of retrying blindly.
+**Problem:** A payment provider can accept an authorization while its response is lost. The application sees a timeout, but that does not mean the provider rejected it. Pressing “retry” can submit another authorization. Operators need to know what happened, what action is safe and who approved it.
 
-## Live demo
+**Solution:** V-Pulse separates three actions:
 
-- Application: [v-pulse-payment-ops.vmarket-vietdung2005.workers.dev](https://v-pulse-payment-ops.vmarket-vietdung2005.workers.dev)
-- Backend readiness: [v-pulse-api.onrender.com/actuator/health/readiness](https://v-pulse-api.onrender.com/actuator/health/readiness)
-- Public deployment proof: [docs/evidence/live-deployment.md](docs/evidence/live-deployment.md)
-- Short-lived AWS deployment proof: [docs/evidence/aws-deployment.md](docs/evidence/aws-deployment.md)
+1. **Investigate:** Look up the original operation using its saved provider reference.
+2. **Review and confirm:** Record a local success only when evidence verifies it.
+3. **Retry only when permitted:** A separate, explicit action is available only when the simulator establishes a safe path.
 
-The backend uses Render's free web-service tier, so the first request after 15 minutes without inbound traffic can take about a minute while the container wakes up.
+Unknown, unavailable and “not found” results remain blocked. **Lookup and confirmation never submit a new authorization.**
 
-## Architecture
+<details>
+<summary>View the provider-evidence screenshot</summary>
 
-```mermaid
-flowchart LR
-  Browser -->|same-origin API| BFF[Next.js BFF on Cloudflare]
-  BFF -->|shared trust header| API[Java 21 / Spring Boot]
-  API --> PG[(PostgreSQL)]
-  API --> Redis[(Redis rate budget)]
-  API --> Rail[Payment rail adapter]
-  Rail --> CB[Circuit breaker + bulkhead + timeout]
-  API --> Metrics[Prometheus / OpenTelemetry]
-  Metrics --> Grafana[Grafana]
-```
+![Provider evidence awaiting explicit operator confirmation](docs/fde/evidence/accepted-lost-evidence.png)
 
-The browser never receives BFF or operations credentials. The Spring service uses short database transactions around state transitions; it does not hold a connection while waiting for a rail. A failed or timed-out authorization is persisted in the parking queue, while an interrupted `PROCESSING` instruction is recovered by a scheduled reconciler.
+</details>
 
-## What is implemented
+## Engineering
 
-- Java 21 virtual-thread rail calls with a 250 ms timeout, per-rail semaphore bulkhead, and Resilience4j circuit breaker.
-- PostgreSQL state machine, Flyway migration, attempt history, parking queue, operator audit events, atomic replay claim, and stalled-work recovery.
-- Atomic Redis Lua rate budget with an availability-preserving fail-open policy and metrics.
-- Spring Boot Actuator health probes, Prometheus metrics, OpenTelemetry bridge, and a provisioned Grafana dashboard.
-- Next.js 16 BFF allow-list, server-only credential injection, strict CSP, and a responsive incident control plane.
-- Non-root multi-stage Docker image, local Compose stack, and a Helm chart with probes, limits, HPA, PDB, NetworkPolicy, and hardened pod security context.
-- Testcontainers integration tests, Vitest unit tests, Playwright operator-flow tests, dependency audit, and four-lane CI.
+- **Original-operation identity:** A stable reference is saved before each authorization attempt. A separate simulator ledger preserves the provider's result even if the application's result cannot be saved.
+- **Separate observation and action:** Provider evidence is stored before an operator can confirm a resolution. The UI displays the permitted next action and requires explicit confirmation.
+- **Concurrent decision safety:** Database locks and version checks prevent two operators—or an outdated screen—from applying conflicting decisions.
+- **Crash recovery:** Investigation claims are saved before lookup. After interruption, an operator can safely look up the original operation again.
+- **Failure containment:** Response timeouts, per-provider concurrency limits and circuit breakers contain an unhealthy dependency rather than recursively retrying it.
+- **Traceability:** Operator sessions, access checks, action history, request identifiers and metrics make the recovery decision inspectable.
 
-## Run locally
+**Core stack:** Java 21, Spring Boot, PostgreSQL, Redis, React/Next.js and TypeScript. Docker and GitHub Actions support repeatable delivery.
 
-Prerequisites: Node.js 22, Java 21, and Docker.
+## Impact & Results
 
-```bash
-cp .env.example .env.local
-docker compose up --build -d
-npm ci
-npm run dev
-```
+These are **observed outcomes from a local simulated incident exercise**, not real charges, settlement results or unit-test counts. Recorded on 24 October 2026 using the real application, browser and disposable databases.
 
-Open `http://localhost:3000`; Prometheus is at `http://localhost:9090` and Grafana at `http://localhost:3001` (`admin` / `vpulse-local`). Demo seed data is enabled only by Compose; it defaults off in the application.
+| Situation | Measured outcome | Why it matters |
+| --- | --- | --- |
+| Provider accepts, but the application receives no response | Investigation and explicit confirmation resolve the payment with **1 total provider authorization call** | Recovery adds **0 authorization calls**, avoiding a second submission in this scenario. |
+| Two operators' requests investigate and confirm concurrently | **1 investigation ID, 1 resolution-history event and 1 provider call** | Concurrent requests reach one consistent decision without duplicate authorization. |
+| Unknown, unavailable or not-found provider result | **All 3 outcome types remain parked; replay is refused** | Missing or inconclusive evidence does not become permission to submit another authorization. |
+| Application process is killed during investigation | Restart preserves the interrupted history and resolves the original payment with **1 total provider call** | Investigation can recover without repeating the financial-like action. |
+| Provider definitively rejects without execution | **1 rejected call + 1 separately approved new attempt** | A deliberate permitted retry is distinguishable from an automatic duplicate. |
 
-### Operator access (local remediation branch)
+**Evidence:** [Machine-readable incident outcomes](docs/fde/evidence/game-day.json) · [Timeline, screenshots and method](docs/fde/incident-report.md). The HTTP concurrency exercise uses one QA account; a separate database exercise covers distinct operator actors.
 
-The public dashboard is read-only. Creating simulated payments, changing rail faults, and replaying parked work require an authenticated `OPERATOR` session and a CSRF token. Operators are explicitly trusted across this single demo dataset; merchant-scoped self-service accounts are not exposed. A caller cannot gain this role by choosing a `merchantId` or sending an operations service secret.
+The crash scenario killed and restarted the actual Java process. Its investigation lease was deliberately expired in the disposable database, so it does **not** establish a production recovery-time promise. Results establish behavior in these scenarios—not a universal exactly-once guarantee.
 
-Migration V2 adds PostgreSQL accounts, login windows, and durable Spring Session tables. Set `AUTH_BOOTSTRAP_USERNAME` and `AUTH_BOOTSTRAP_PASSWORD_HASH` (BCrypt) in the **backend process environment** to provision the initial operator. Both blank means no default account. Existing accounts are not overwritten; never publish operator credentials. Spring does not automatically load Next.js `.env.local`.
+## Explore the project
 
-Cookies are HttpOnly, SameSite=Lax and Secure by default; production rejects `AUTH_SECURE_COOKIE=false`. Set false only for local HTTP (Compose does this). Session idle timeout is 15 minutes. Disabling an account or changing its database role takes effect on its next request; there is no public signup/password recovery workflow.
+- **For a quick explanation:** [Customer scenario](docs/fde/customer-incident-brief.md) · [English walkthrough](docs/fde/customer-demo-script.md).
+- **For engineering detail:** [Reconciliation contract](docs/fde/payment-reconciliation-contract.md) · [Recovery decision matrix](docs/fde/recovery-decision-matrix.md).
+- **For reproducibility:** [Acceptance evidence](docs/fde/acceptance-tests.md) · [Developer guide](docs/developer-guide.md).
+- **For incident handling:** [Operations handoff](docs/fde/operations-handoff.md) · [Runbook](docs/RUNBOOK.md).
 
-Login is limited to 10 attempts/minute per backend peer address in PostgreSQL. A shared BFF may share that budget: this is not a per-end-user-IP limiter, and arbitrary forwarded-IP headers are not trusted. Use HTTPS and platform ingress limits in production.
+### Demo boundaries
 
-For a real frontend → BFF → Java → PostgreSQL browser check, run backend verify and frontend build **before** this command; do not rebuild concurrently:
+A personal portfolio project using a deterministic payment simulator. **No real payment credentials, charges or provider integration.** The provider ledger commits independently of local payment state but shares PostgreSQL availability; this is not an independently hosted financial system.
 
-```powershell
-pwsh -NoProfile -File tools/verify-operator-session.ps1
-```
+Cloudflare serves the frontend; Render hosts Java with Neon PostgreSQL and Upstash Redis. Free-host startup can delay initial requests. Mutation controls require a provisioned operator account; credentials are not published. Historical operations without a trustworthy reference remain manual-review cases.
 
-The script creates disposable local PostgreSQL/Redis containers and removes them afterwards. It does not touch production. See [local remediation evidence](docs/evidence/remediation-2026-10-18.md); live links above still represent the earlier deployed version until coordinated rollout.
+---
 
-## Verification
-
-### Merchant operation identity (local, not yet deployed)
-
-Payment create now requires `Idempotency-Key` (8–120 ASCII identifier characters). Merchant IDs are trimmed/uppercased before lookup, fingerprinting and quota. V3 atomically stores the key/request hashes, instruction reference and received audit; historical instructions are preserved without fabricated operation identities. Matching duplicates do not call the gateway or consume a new create quota unit; changed payment details return 409. A pending duplicate returns the same instruction with 202, terminal duplicate 200, and a newly completed create 201.
-
-The browser saves a UUID and canonical payment payload before sending, preserves them on failed/unverified/PROCESSING responses, and retries the same key after reload only on explicit submission. Edited details cannot reuse an unresolved intent. Storage failures/corruption fail closed. No login cookie, CSRF token or service credential is stored there. Form restoration/recovery guidance is still basic; deleting/cloning storage or switching devices is not account recovery. The ledger is retained with business instructions, not expired to permit re-execution.
-
-This prevents duplicate **local create** operations, not duplicate provider settlement. The simulated provider now supports stable references, immutable outcome lookup, accepted-but-response-lost reconciliation and expiring investigation claims. Its ledger is independent of local payment state/commit but shares the same database availability domain. Existing payment stale-work recovery remains a two-minute scan, not a general durable worker lease system. Do not infer that a healthy rail makes an unknown earlier outcome safe to replay.
-
-Before rollout: stop old writers/pause mutations, back up and apply additive migrations through V5, deploy matching backend/BFF/client, then smoke. Old clients without a key get 400; mixed-version zero-downtime rollout is not promised. Rerun dependency audit before deployment; the latest local run is a snapshot, not a permanent security guarantee. No new platform keys are needed for this local work.
-
-```bash
-npm run verify
-npm run test:e2e
-cd backend && ./mvnw verify
-docker compose config --quiet
-helm lint infra/helm/vpulse
-```
-
-The local browser suite starts on `127.0.0.1:3207`; set `PLAYWRIGHT_PORT` to override that port or `PLAYWRIGHT_BASE_URL` to test an existing deployment.
-
-See [pain-point evidence](docs/PAIN_POINT_PROOF.md), [architecture decisions](docs/ARCHITECTURE.md), [incident runbook](docs/RUNBOOK.md), and the [game-day postmortem](docs/POSTMORTEM.md).
+Former repository name: `Project3`. The new name changes the repository address, not the live-demo URL.

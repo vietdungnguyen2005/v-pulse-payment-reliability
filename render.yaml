@@ -2,7 +2,7 @@ services:
   - type: web
     name: v-pulse-api
     runtime: docker
-    repo: https://github.com/vietdungnguyen2005/Project3
+    repo: https://github.com/vietdungnguyen2005/v-pulse-payment-reliability
     branch: main
     rootDir: backend
     dockerfilePath: ./Dockerfile

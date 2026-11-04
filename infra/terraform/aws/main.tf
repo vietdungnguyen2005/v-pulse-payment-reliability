@@ -11,7 +11,7 @@ locals {
     Project     = "V-Pulse"
     Environment = var.environment
     ManagedBy   = "Terraform"
-    Repository  = "vietdungnguyen2005/Project3"
+    Repository  = "vietdungnguyen2005/v-pulse-payment-reliability"
     ExpiresAt   = var.expires_at
   }
 }
