@@ -1,0 +1,180 @@
+{
+  "sourceSha" : "47fe5dff8fd8e0d81e55c0b4fad50bddbf3caec3",
+  "synthetic" : true,
+  "startedAtUtc" : "2026-11-09T01:55:25.553182500Z",
+  "scenarios" : [ {
+    "scenario" : "accepted-lost-repeated-resolution",
+    "before" : {
+      "localState" : "PARKED",
+      "authorizationCalls" : 1,
+      "providerOutcome" : "AUTHORIZED",
+      "resolutionAudits" : 0,
+      "resolvedEvidenceRows" : 0
+    },
+    "operatorRequired" : true,
+    "afterLookup" : {
+      "localState" : "PARKED",
+      "authorizationCalls" : 1,
+      "providerOutcome" : "AUTHORIZED",
+      "resolutionAudits" : 0,
+      "resolvedEvidenceRows" : 0
+    },
+    "after" : {
+      "localState" : "SUCCEEDED",
+      "authorizationCalls" : 1,
+      "providerOutcome" : "AUTHORIZED",
+      "resolutionAudits" : 1,
+      "resolvedEvidenceRows" : 1
+    },
+    "correctlyRejectedOperatorCommands" : 0,
+    "unexpectedAdditionalAuthorizationCalls" : 0,
+    "expectedFinalState" : "SUCCEEDED",
+    "outcome" : "passed"
+  }, {
+    "scenario" : "concurrent-investigation-resolution",
+    "before" : {
+      "localState" : "PARKED",
+      "authorizationCalls" : 1,
+      "providerOutcome" : "AUTHORIZED",
+      "resolutionAudits" : 0,
+      "resolvedEvidenceRows" : 0
+    },
+    "operatorRequired" : true,
+    "after" : {
+      "localState" : "SUCCEEDED",
+      "authorizationCalls" : 1,
+      "providerOutcome" : "AUTHORIZED",
+      "resolutionAudits" : 1,
+      "resolvedEvidenceRows" : 1
+    },
+    "correctlyRejectedOperatorCommands" : 0,
+    "unexpectedAdditionalAuthorizationCalls" : 0,
+    "expectedFinalState" : "SUCCEEDED",
+    "outcome" : "passed"
+  }, {
+    "scenario" : "UNKNOWN",
+    "before" : {
+      "localState" : "PARKED",
+      "authorizationCalls" : 1,
+      "providerOutcome" : "INCOMPLETE",
+      "resolutionAudits" : 0,
+      "resolvedEvidenceRows" : 0
+    },
+    "operatorRequired" : true,
+    "observedOutcome" : "UNKNOWN",
+    "resolveHttpStatus" : 409,
+    "replayHttpStatus" : 409,
+    "after" : {
+      "localState" : "PARKED",
+      "authorizationCalls" : 1,
+      "providerOutcome" : "INCOMPLETE",
+      "resolutionAudits" : 0,
+      "resolvedEvidenceRows" : 0
+    },
+    "correctlyRejectedOperatorCommands" : 2,
+    "unexpectedAdditionalAuthorizationCalls" : 0,
+    "expectedFinalState" : "PARKED",
+    "outcome" : "passed"
+  }, {
+    "scenario" : "UNAVAILABLE",
+    "before" : {
+      "localState" : "PARKED",
+      "authorizationCalls" : 1,
+      "providerOutcome" : "INCOMPLETE",
+      "resolutionAudits" : 0,
+      "resolvedEvidenceRows" : 0
+    },
+    "operatorRequired" : true,
+    "observedOutcome" : "PROVIDER_UNAVAILABLE",
+    "resolveHttpStatus" : 409,
+    "replayHttpStatus" : 409,
+    "after" : {
+      "localState" : "PARKED",
+      "authorizationCalls" : 1,
+      "providerOutcome" : "INCOMPLETE",
+      "resolutionAudits" : 0,
+      "resolvedEvidenceRows" : 0
+    },
+    "correctlyRejectedOperatorCommands" : 2,
+    "unexpectedAdditionalAuthorizationCalls" : 0,
+    "expectedFinalState" : "PARKED",
+    "outcome" : "passed"
+  }, {
+    "scenario" : "NOT_FOUND",
+    "before" : {
+      "localState" : "PARKED",
+      "authorizationCalls" : 1,
+      "providerOutcome" : "INCOMPLETE",
+      "resolutionAudits" : 0,
+      "resolvedEvidenceRows" : 0
+    },
+    "operatorRequired" : true,
+    "observedOutcome" : "NOT_FOUND",
+    "resolveHttpStatus" : 409,
+    "replayHttpStatus" : 409,
+    "after" : {
+      "localState" : "PARKED",
+      "authorizationCalls" : 1,
+      "providerOutcome" : "RECORD_ABSENT",
+      "resolutionAudits" : 0,
+      "resolvedEvidenceRows" : 0
+    },
+    "correctlyRejectedOperatorCommands" : 2,
+    "unexpectedAdditionalAuthorizationCalls" : 0,
+    "expectedFinalState" : "PARKED",
+    "outcome" : "passed"
+  }, {
+    "scenario" : "database-finalization-rollback",
+    "before" : null,
+    "beforeEvidence" : "Preconditions asserted in unchanged original method, not separately snapshotted",
+    "originalMethod" : "providerCommitSurvivesLocalFinalizationRollbackAndRecoveryNeverReauthorizes",
+    "after" : {
+      "localState" : "SUCCEEDED",
+      "authorizationCalls" : 1,
+      "providerOutcome" : "AUTHORIZED",
+      "resolutionAudits" : 1,
+      "resolvedEvidenceRows" : 1
+    },
+    "operatorRequired" : true,
+    "unexpectedAdditionalAuthorizationCalls" : 0,
+    "correctlyRejectedOperatorCommands" : 0,
+    "expectedFinalState" : "SUCCEEDED",
+    "outcome" : "passed"
+  }, {
+    "scenario" : "permission-revoked-while-lock-wait",
+    "before" : null,
+    "beforeEvidence" : "Preconditions asserted in unchanged original method, not separately snapshotted",
+    "originalMethod" : "replayRechecksPermissionAfterWaitingForTheInstructionLock",
+    "after" : {
+      "localState" : "PARKED",
+      "authorizationCalls" : 0,
+      "providerOutcome" : "RECORD_ABSENT",
+      "resolutionAudits" : 0,
+      "resolvedEvidenceRows" : 0
+    },
+    "operatorRequired" : false,
+    "unexpectedAdditionalAuthorizationCalls" : 0,
+    "correctlyRejectedOperatorCommands" : 1,
+    "expectedFinalState" : "PARKED",
+    "outcome" : "passed"
+  }, {
+    "scenario" : "late-provider-response",
+    "before" : null,
+    "beforeEvidence" : "Preconditions asserted in unchanged original method, not separately snapshotted",
+    "originalMethod" : "aLateGatewayResultCannotOverwriteARecoveredInstruction",
+    "after" : {
+      "localState" : "PARKED",
+      "authorizationCalls" : 1,
+      "providerOutcome" : "RECORD_ABSENT",
+      "resolutionAudits" : 0,
+      "resolvedEvidenceRows" : 0
+    },
+    "operatorRequired" : false,
+    "unexpectedAdditionalAuthorizationCalls" : 0,
+    "correctlyRejectedOperatorCommands" : 0,
+    "expectedFinalState" : "PARKED",
+    "outcome" : "passed"
+  } ],
+  "outcome" : "passed",
+  "finishedAtUtc" : "2026-11-09T01:55:28.939756200Z"
+}
